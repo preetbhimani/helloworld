@@ -1,45 +1,15 @@
-@Service
-public class ImageService {
+@PostMapping("/{id}/photo")
+public ResponseEntity<Map<String, String>> uploadEmployeePhoto(
+        @PathVariable UUID id,
+        @RequestParam("file") MultipartFile file) throws IOException {
 
-    @Value("${file.upload-dir}")
-    private String uploadDir;
+    String fileName = employeeService.uploadEmployeePhoto(id, file);
 
-    public String uploadImage(MultipartFile file) throws IOException {
+    Map<String, String> response = new HashMap<>();
+    response.put("message", "Photo uploaded successfully");
+    response.put("fileName", fileName);
 
-        if (file.isEmpty()) {
-            throw new BadRequestException("File is empty");
-        }
-
-        String contentType = file.getContentType();
-        if (!contentType.equals("image/jpeg") && !contentType.equals("image/png")) {
-            throw new BadRequestException("Only JPG or PNG images are allowed");
-        }
-
-        File directory = new File(uploadDir);
-        if (!directory.exists()) {
-            directory.mkdirs();
-        }
-
-        String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-        Path filePath = Paths.get(uploadDir, fileName);
-
-        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
-        return fileName;
-    }
-
-    public Resource getImage(String fileName) throws MalformedURLException {
-
-        Path path = Paths.get(uploadDir).resolve(fileName);
-
-        Resource resource = new UrlResource(path.toUri());
-
-        if (!resource.exists()) {
-            throw new ResourceNotFoundException("Image not found: " + fileName);
-        }
-
-        return resource;
-    }
+    return ResponseEntity.ok(response); // simple 200 OK
 }
 
 
@@ -51,39 +21,39 @@ public class ImageService {
 
 
 
+public String uploadEmployeePhoto(UUID id, MultipartFile file) throws IOException {
+
+    // 1. Find employee
+    Employee employee = employeeRepo.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
+
+    // 2. Save image to local drive
+    String fileName = saveImageToLocal(file);
+
+    // 3. Save filename/path in DB
+    employee.setPhoto(fileName);
+    employeeRepo.save(employee);
+
+    return fileName;
+}
 
 
 
-@RestController
-@RequestMapping("/api/v1/images")
-@RequiredArgsConstructor
-public class ImageController {
 
-    private final ImageService imageService;
+@Value("${file.upload-dir}")
+private String uploadDir;
 
-    // Upload image
-    @PostMapping
-    public ResponseEntity<Map<String, String>> uploadImage(
-            @RequestParam("file") MultipartFile file) throws IOException {
+private String saveImageToLocal(MultipartFile file) throws IOException {
 
-        String fileName = imageService.uploadImage(file);
-
-        Map<String, String> response = new HashMap<>();
-        response.put("message", "Image uploaded successfully");
-        response.put("fileName", fileName);
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    Path uploadPath = Paths.get(uploadDir);
+    if (!Files.exists(uploadPath)) {
+        Files.createDirectories(uploadPath);
     }
 
-    // Fetch image
-    @GetMapping("/{fileName}")
-    public ResponseEntity<Resource> getImage(@PathVariable String fileName)
-            throws MalformedURLException {
+    String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
+    Path filePath = uploadPath.resolve(fileName);
 
-        Resource resource = imageService.getImage(fileName);
+    Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-        return ResponseEntity.ok()
-                .contentType(MediaType.IMAGE_JPEG) // OK for beginner level
-                .body(resource);
-    }
+    return fileName; // store ONLY file name in DB
 }
