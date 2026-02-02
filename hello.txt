@@ -1,59 +1,55 @@
-@PostMapping("/{id}/photo")
-public ResponseEntity<Map<String, String>> uploadEmployeePhoto(
-        @PathVariable UUID id,
-        @RequestParam("file") MultipartFile file) throws IOException {
+@Component
+public class DummyAuthFilter extends OncePerRequestFilter {
 
-    String fileName = employeeService.uploadEmployeePhoto(id, file);
+    private static final String AUTH_HEADER = "X-AUTH-TOKEN";
+    private static final String VALID_TOKEN = "EMPLOYEE_API_TOKEN";
 
-    Map<String, String> response = new HashMap<>();
-    response.put("message", "Photo uploaded successfully");
-    response.put("fileName", fileName);
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
 
-    return ResponseEntity.ok(response); // simple 200 OK
-}
+        // Allow swagger & images without auth
+        String path = request.getRequestURI();
+        if (path.startsWith("/swagger") || path.startsWith("/v3") || path.startsWith("/photo")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
+        String token = request.getHeader(AUTH_HEADER);
 
+        if (token == null || !VALID_TOKEN.equals(token)) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"message\":\"Invalid or missing token\"}");
+            return;
+        }
 
-
-
-
-
-
-
-
-public String uploadEmployeePhoto(UUID id, MultipartFile file) throws IOException {
-
-    // 1. Find employee
-    Employee employee = employeeRepo.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Employee not found"));
-
-    // 2. Save image to local drive
-    String fileName = saveImageToLocal(file);
-
-    // 3. Save filename/path in DB
-    employee.setPhoto(fileName);
-    employeeRepo.save(employee);
-
-    return fileName;
-}
-
-
-
-
-@Value("${file.upload-dir}")
-private String uploadDir;
-
-private String saveImageToLocal(MultipartFile file) throws IOException {
-
-    Path uploadPath = Paths.get(uploadDir);
-    if (!Files.exists(uploadPath)) {
-        Files.createDirectories(uploadPath);
+        filterChain.doFilter(request, response);
     }
+}
 
-    String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-    Path filePath = uploadPath.resolve(fileName);
 
-    Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-    return fileName; // store ONLY file name in DB
+
+
+
+
+
+
+
+
+
+@Configuration
+public class FilterConfig {
+
+    @Bean
+    public FilterRegistrationBean<DummyAuthFilter> authFilter(DummyAuthFilter filter) {
+        FilterRegistrationBean<DummyAuthFilter> registration = new FilterRegistrationBean<>();
+        registration.setFilter(filter);
+        registration.addUrlPatterns("/api/*"); // protect APIs
+        registration.setOrder(1);
+        return registration;
+    }
 }
