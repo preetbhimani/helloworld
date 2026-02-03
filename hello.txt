@@ -1,49 +1,47 @@
-using Microsoft.EntityFrameworkCore;
-using SimpleStore.Repository.Data;
 using SimpleStore.Repository.Models;
+using SimpleStore.Repository.Repositories;
 
-namespace SimpleStore.Repository.Repositories
+namespace SimpleStore.Service.services
 {
-    public class ProductRepository : IProductRepository
+    public class ProductService : IProductService
     {
-        private readonly AppDbContext _context;
+        private readonly IProductRepository _productRepository;
 
-        public ProductRepository(AppDbContext context)
+        public ProductService(IProductRepository productRepository)
         {
-            _context = context;
+            _productRepository = productRepository;
         }
 
-        public async Task<IEnumerable<Product>> GetAllAsync()
+        public async Task<IEnumerable<Product>> GetAllProductsAsync()
         {
-            return await _context.Products.ToListAsync();
+            return await _productRepository.GetAllAsync();
         }
 
-        public async Task<Product?> GetByIdAsync(Guid productId)
+        public async Task<Product> GetProductByIdAsync(Guid productId)
         {
-            return await _context.Products.FirstOrDefaultAsync(p => p.ProductId == productId);
+            return await _productRepository.GetByIdAsync(productId);
         }
 
-        public async Task<Product> AddAsync(Product product)
+        public async Task CreateProductAsync(Product product)
         {
-            _context.Products.Add(product);
-            await _context.SaveChangesAsync();
-            return product;
+            // business rules here
+            if (product.Price <= 0)
+                throw new Exception("Price must be greater than zero");
+
+            await _productRepository.AddAsync(product);
         }
 
-        public async Task UpdateAsync(Product product)
+        public async Task UpdateProductAsync(Product product)
         {
-            _context.Products.Update(product);
-            await _context.SaveChangesAsync();
+            if (product.Price <= 0)
+                throw new Exception("Price must be greater than zero");
+
+            await _productRepository.UpdateAsync(product);
         }
 
-        public async Task DeleteAsync(Guid productId)
+        public async Task DeleteProductAsync(Guid productId)
         {
-            var product = await GetByIdAsync(productId);
-            if (product != null)
-            {
-                _context.Products.Remove(product);
-                await _context.SaveChangesAsync();
-            }
+            await _productRepository.DeleteAsync(productId);
         }
     }
 }
