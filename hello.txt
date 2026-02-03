@@ -1,97 +1,49 @@
-@Component
-public class AuthFilter extends OncePerRequestFilter {
+using Microsoft.EntityFrameworkCore;
+using SimpleStore.Repository.Data;
+using SimpleStore.Repository.Models;
 
-    private static final String DUMMY_TOKEN = "DUMMY_AUTH_TOKEN_123";
+namespace SimpleStore.Repository.Repositories
+{
+    public class ProductRepository : IProductRepository
+    {
+        private readonly AppDbContext _context;
 
-    @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain)
-            throws ServletException, IOException {
-
-        String path = request.getRequestURI();
-
-        // Allow login without auth
-        if (path.startsWith("/api/auth/login")) {
-            filterChain.doFilter(request, response);
-            return;
+        public ProductRepository(AppDbContext context)
+        {
+            _context = context;
         }
 
-        // Read cookie
-        Cookie[] cookies = request.getCookies();
-        if (cookies == null) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Authentication required");
-            return;
+        public async Task<IEnumerable<Product>> GetAllAsync()
+        {
+            return await _context.Products.ToListAsync();
         }
 
-        boolean authenticated = false;
+        public async Task<Product?> GetByIdAsync(Guid productId)
+        {
+            return await _context.Products.FirstOrDefaultAsync(p => p.ProductId == productId);
+        }
 
-        for (Cookie cookie : cookies) {
-            if ("AUTH_TOKEN".equals(cookie.getName())
-                    && DUMMY_TOKEN.equals(cookie.getValue())) {
-                authenticated = true;
-                break;
+        public async Task<Product> AddAsync(Product product)
+        {
+            _context.Products.Add(product);
+            await _context.SaveChangesAsync();
+            return product;
+        }
+
+        public async Task UpdateAsync(Product product)
+        {
+            _context.Products.Update(product);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteAsync(Guid productId)
+        {
+            var product = await GetByIdAsync(productId);
+            if (product != null)
+            {
+                _context.Products.Remove(product);
+                await _context.SaveChangesAsync();
             }
         }
-
-        if (!authenticated) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or missing token");
-            return;
-        }
-
-        filterChain.doFilter(request, response);
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-@RestController
-@RequestMapping("/api/auth")
-public class AuthController {
-
-    @PostMapping("/login")
-    public ResponseEntity<Map<String, String>> login(
-            @RequestParam String username,
-            @RequestParam String password,
-            HttpServletResponse response) {
-
-        // DUMMY CHECK
-        if (!"admin".equals(username) || !"admin123".equals(password)) {
-            throw new BadRequestException("Invalid credentials");
-        }
-
-        // Dummy token
-        String token = "DUMMY_AUTH_TOKEN_123";
-
-        Cookie cookie = new Cookie("AUTH_TOKEN", token);
-        cookie.setHttpOnly(true);
-        cookie.setPath("/");
-        cookie.setMaxAge(60 * 60); // 1 hour
-
-        response.addCookie(cookie);
-
-        Map<String, String> res = new HashMap<>();
-        res.put("message", "Login successful");
-
-        return ResponseEntity.ok(res);
     }
 }
