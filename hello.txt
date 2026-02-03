@@ -1,47 +1,92 @@
+using Microsoft.AspNetCore.Mvc;
+using SimpleStore.Service.services;
 using SimpleStore.Repository.Models;
-using SimpleStore.Repository.Repositories;
 
-namespace SimpleStore.Service.services
+namespace SimpleStore.Controllers
 {
-    public class ProductService : IProductService
+    public class ProductsController : Controller
     {
-        private readonly IProductRepository _productRepository;
+        private readonly IProductService productService;
 
-        public ProductService(IProductRepository productRepository)
+        public ProductsController(IProductService productService)
         {
-            _productRepository = productRepository;
+            this.productService = productService;
         }
 
-        public async Task<IEnumerable<Product>> GetAllProductsAsync()
+        // GET: /Products
+        public async Task<IActionResult> Index()
         {
-            return await _productRepository.GetAllAsync();
+            var products = await productService.GetAllProductsAsync();
+            return View(products);
         }
 
-        public async Task<Product> GetProductByIdAsync(Guid productId)
+        // GET: /Products/Details/{id}
+        public async Task<IActionResult> Details(Guid id)
         {
-            return await _productRepository.GetByIdAsync(productId);
+            var product = await productService.GetProductByIdAsync(id);
+            if (product == null)
+                return NotFound();
+
+            return View(product);
         }
 
-        public async Task CreateProductAsync(Product product)
+        // GET: /Products/Create
+        public IActionResult Create()
         {
-            // business rules here
-            if (product.Price <= 0)
-                throw new Exception("Price must be greater than zero");
-
-            await _productRepository.AddAsync(product);
+            return View();
         }
 
-        public async Task UpdateProductAsync(Product product)
+        // POST: /Products/Create
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(Product product)
         {
-            if (product.Price <= 0)
-                throw new Exception("Price must be greater than zero");
+            if (!ModelState.IsValid)
+                return View(product);
 
-            await _productRepository.UpdateAsync(product);
+            await productService.CreateProductAsync(product);
+            return RedirectToAction(nameof(Index));
         }
 
-        public async Task DeleteProductAsync(Guid productId)
+        // GET: /Products/Edit/{id}
+        public async Task<IActionResult> Edit(Guid id)
         {
-            await _productRepository.DeleteAsync(productId);
+            var product = await productService.GetProductByIdAsync(id);
+            if (product == null)
+                return NotFound();
+
+            return View(product);
+        }
+
+        // POST: /Products/Edit
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(Product product)
+        {
+            if (!ModelState.IsValid)
+                return View(product);
+
+            await productService.UpdateProductAsync(product);
+            return RedirectToAction(nameof(Index));
+        }
+
+        // GET: /Products/Delete/{id}
+        public async Task<IActionResult> Delete(Guid id)
+        {
+            var product = await productService.GetProductByIdAsync(id);
+            if (product == null)
+                return NotFound();
+
+            return View(product);
+        }
+
+        // POST: /Products/Delete/{id}
+        [HttpPost, ActionName("Delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteConfirmed(Guid id)
+        {
+            await productService.DeleteProductAsync(id);
+            return RedirectToAction(nameof(Index));
         }
     }
 }
