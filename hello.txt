@@ -1,28 +1,60 @@
-@model SimpleStore.Repository.Models.Product
+package com.example.hrms_backend.security;
 
-@{
-    ViewData["Title"] = "Product Details";
+import com.example.hrms_backend.entities.User;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+
+public class CustomUserDetails implements UserDetails {
+
+    private final User user;
+
+    public CustomUserDetails(User user) {
+        this.user = user;
+    }
+
+    // 🔑 For JWT claims
+    public UUID getUserId() {
+        return user.getUserId();
+    }
+
+    public String getRole() {
+        return user.getRole().getRoleName();
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return List.of(
+            new SimpleGrantedAuthority(
+                "ROLE_" + user.getRole().getRoleName()
+            )
+        );
+    }
+
+    @Override
+    public String getPassword() {
+        return user.getPassword();
+    }
+
+    @Override
+    public String getUsername() {
+        return user.getEmail();
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return user.isActive();
+    }
+
+    @Override public boolean isAccountNonExpired() { return true; }
+    @Override public boolean isAccountNonLocked() { return true; }
+    @Override public boolean isCredentialsNonExpired() { return true; }
 }
 
-<div class="card mt-4" style="max-width: 500px;">
-    <div class="card-body">
-        <h5 class="card-title">@Model.Name</h5>
-
-        <p class="card-text">
-            <strong>Category:</strong> @Model.Category <br />
-            <strong>Price:</strong> ₹@Model.Price <br />
-            <strong>Quantity:</strong> @Model.Quantity <br />
-            <strong>Expiry Date:</strong>
-            @(Model.Expirydate.HasValue
-                ? Model.Expirydate.Value.ToString("yyyy-MM-dd")
-                : "null")
-        </p>
-
-        <a asp-action="Index" class="btn btn-secondary btn-sm">
-            Back to List
-        </a>
-    </div>
-</div>
 
 
 
@@ -32,6 +64,54 @@
 
 
 
-<a asp-action="Details" asp-route-id="@item.ProductId" class="btn btn-sm btn-info">
-    View
-</a>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+package com.example.hrms_backend.security;
+
+import com.example.hrms_backend.entities.User;
+import com.example.hrms_backend.repositories.UserRepo;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class CustomUserDetailsService implements UserDetailsService {
+
+    private final UserRepo userRepo;
+
+    @Override
+    public UserDetails loadUserByUsername(String email)
+            throws UsernameNotFoundException {
+
+        User user = userRepo.findByEmail(email)
+            .orElseThrow(() ->
+                new UsernameNotFoundException(
+                    "User not found with email: " + email
+                )
+            );
+
+        return new CustomUserDetails(user);
+    }
+}
