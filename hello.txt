@@ -1,58 +1,64 @@
-package com.example.hrms_backend.security;
+@Entity
+@Table(name = "employees")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Employee {
 
-import com.example.hrms_backend.entities.User;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "employee_id")
+    private UUID employeeId;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.UUID;
+    private String name;
 
-public class CustomUserDetails implements UserDetails {
+    @Column(unique = true, nullable = false)
+    private String email;
 
-    private final User user;
+    private LocalDateTime dob;
 
-    public CustomUserDetails(User user) {
-        this.user = user;
-    }
+    private String city;
 
-    // 🔑 For JWT claims
-    public UUID getUserId() {
-        return user.getUserId();
-    }
+    @Column(name = "phone_number")
+    private String phoneNumber;
 
-    public String getRole() {
-        return user.getRole().getRoleName();
-    }
+    private String address;
 
-    @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(
-            new SimpleGrantedAuthority(
-                "ROLE_" + user.getRole().getRoleName()
-            )
-        );
-    }
+    @Column(name = "joining_date")
+    private LocalDateTime joiningDate;
 
-    @Override
-    public String getPassword() {
-        return user.getPassword();
-    }
+    /* ================= ORG STRUCTURE ================= */
 
-    @Override
-    public String getUsername() {
-        return user.getEmail();
-    }
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id", nullable = false)
+    private Department department;
 
-    @Override
-    public boolean isEnabled() {
-        return user.isActive();
-    }
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manager_id")
+    private Employee manager;
 
-    @Override public boolean isAccountNonExpired() { return true; }
-    @Override public boolean isAccountNonLocked() { return true; }
-    @Override public boolean isCredentialsNonExpired() { return true; }
+    /* ================= AUTH LINK ================= */
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    private User user;
+
+    /* ================= GAME PREFERENCES ================= */
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "employee_game_preferences",
+        joinColumns = @JoinColumn(name = "employee_id"),
+        inverseJoinColumns = @JoinColumn(name = "game_id")
+    )
+    private Set<Game> gamePreferences = new HashSet<>();
+
+    /* ================= AUDIT ================= */
+
+    private LocalDateTime createdAt;
+    private UUID createdBy;
+    private LocalDateTime updatedAt;
+    private UUID updatedBy;
 }
 
 
@@ -85,33 +91,374 @@ public class CustomUserDetails implements UserDetails {
 
 
 
-package com.example.hrms_backend.security;
 
-import com.example.hrms_backend.entities.User;
-import com.example.hrms_backend.repositories.UserRepo;
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.stereotype.Service;
 
-@Service
-@RequiredArgsConstructor
-public class CustomUserDetailsService implements UserDetailsService {
 
-    private final UserRepo userRepo;
+@Entity
+@Table(name = "games")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Game {
 
-    @Override
-    public UserDetails loadUserByUsername(String email)
-            throws UsernameNotFoundException {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "game_id")
+    private UUID gameId;
 
-        User user = userRepo.findByEmail(email)
-            .orElseThrow(() ->
-                new UsernameNotFoundException(
-                    "User not found with email: " + email
-                )
-            );
+    @Column(nullable = false, unique = true)
+    private String gameName;
 
-        return new CustomUserDetails(user);
-    }
+    private boolean active = true;
+
+    @ManyToMany(mappedBy = "gamePreferences")
+    private Set<Employee> interestedEmployees = new HashSet<>();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@Entity
+@Table(name = "game_time_slot_config")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class GameTimeSlotConfig {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID configId;
+
+    @ManyToOne
+    @JoinColumn(name = "game_id", nullable = false)
+    private Game game;
+
+    private LocalTime workingStartTime;
+    private LocalTime workingEndTime;
+
+    private int slotDurationMinutes;   // e.g. 30
+    private int maxPlayers;             // e.g. 4
+
+    private boolean active = true;
+
+    private LocalDateTime createdAt;
+    private UUID createdBy;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@Entity
+@Table(name = "time_slots",
+       uniqueConstraints = {
+           @UniqueConstraint(columnNames = {"game_id", "slot_date", "start_time"})
+       })
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class TimeSlot {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID timeSlotId;
+
+    @ManyToOne
+    @JoinColumn(name = "game_id", nullable = false)
+    private Game game;
+
+    @Column(name = "slot_date", nullable = false)
+    private LocalDate slotDate;
+
+    @Column(name = "start_time", nullable = false)
+    private LocalTime startTime;
+
+    @Column(name = "end_time", nullable = false)
+    private LocalTime endTime;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@Entity
+@Table(name = "game_bookings")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class GameBooking {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID gameBookingId;
+
+    @ManyToOne
+    @JoinColumn(name = "time_slot_id", nullable = false)
+    private TimeSlot timeSlot;
+
+    @ManyToOne
+    @JoinColumn(name = "game_id", nullable = false)
+    private Game game;
+
+    // BOOKER
+    @ManyToOne
+    @JoinColumn(name = "booker_id", nullable = false)
+    private Employee booker;
+
+    @Enumerated(EnumType.STRING)
+    private BookingStatus bookingStatus; // CONFIRMED, CANCELLED
+
+    private LocalDateTime bookingStartTime;
+    private LocalDateTime cancellationCutoffTime;
+
+    private LocalDateTime createdAt;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@Entity
+@Table(name = "booking_members",
+       uniqueConstraints = {
+           @UniqueConstraint(columnNames = {"game_booking_id", "employee_id"})
+       })
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class BookingMember {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID bookingMemberId;
+
+    @ManyToOne
+    @JoinColumn(name = "game_booking_id", nullable = false)
+    private GameBooking gameBooking;
+
+    @ManyToOne
+    @JoinColumn(name = "employee_id", nullable = false)
+    private Employee employee;
+
+    private LocalDateTime joinedAt;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@Entity
+@Table(name = "game_waiting_queue",
+       uniqueConstraints = {
+           @UniqueConstraint(columnNames = {"time_slot_id", "employee_id"})
+       })
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class GameWaitingQueue {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID queueId;
+
+    @ManyToOne
+    @JoinColumn(name = "time_slot_id", nullable = false)
+    private TimeSlot timeSlot;
+
+    @ManyToOne
+    @JoinColumn(name = "game_id", nullable = false)
+    private Game game;
+
+    @ManyToOne
+    @JoinColumn(name = "employee_id", nullable = false)
+    private Employee employee;
+
+    @Enumerated(EnumType.STRING)
+    private QueueStatus status; // WAITING, ALLOCATED, CANCELLED
+
+    private LocalDateTime joinedAt;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@Entity
+@Table(name = "game_play_stats",
+       uniqueConstraints = {
+           @UniqueConstraint(columnNames = {"employee_id", "game_id"})
+       })
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class GamePlayStats {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID statsId;
+
+    @ManyToOne
+    @JoinColumn(name = "employee_id", nullable = false)
+    private Employee employee;
+
+    @ManyToOne
+    @JoinColumn(name = "game_id", nullable = false)
+    private Game game;
+
+    private int completedSlots;
+
+    private LocalDateTime lastPlayedAt;
 }
